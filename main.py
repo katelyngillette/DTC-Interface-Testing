@@ -2,6 +2,7 @@ import asyncio
 import sys
 import serial
 import serial.tools.list_ports
+import subprocess
 import modbus_tk
 import modbus_tk.defines as cst
 from modbus_tk import modbus_rtu
@@ -160,6 +161,93 @@ async def selective_ble_selection():
         print(f"[Error] Invalid selection. Choose a number from 1 to {len(target_devices)}.")
 
 async def main():
+    import asyncio
+import glob
+import os
+import subprocess
+
+async def main():
+    # --- PRE-TEST BOARD PROGRAMMING OPTION ---
+    user_choice = input("To program the board the files must be located in the same folder as this program. \nPlease ensure you have the most updated firmware.\nWould you like to program the board first? (y/n): ").strip().lower()
+    
+    if user_choice in ['y', 'yes']:
+        print("\n[Flash] Initializing board programming sequence...")
+        
+        # 1. Dynamically locate the signed hex file in the script's current directory
+        script_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
+        search_pattern = os.path.join(script_dir, "*-zephyr.signed.hex")
+        signed_files = glob.glob(search_pattern)
+        
+        if not signed_files:
+            print("[Flash Error] Could not find a matching '*-zephyr.signed.hex' file in the directory.")
+            print("[Flash Error] Skipping programming phase.\n")
+        import asyncio
+import glob
+import os
+import subprocess
+
+async def main():
+    # --- PRE-TEST BOARD PROGRAMMING OPTION ---
+    user_choice = input("Would you like to program the board first? (y/n): ").strip().lower()
+    
+    if user_choice in ['y', 'yes']:
+        print("\n[Flash] Searching for binary files...")
+        
+        # 1. Dynamically locate the signed hex file in the script's current directory
+        script_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
+        search_pattern = os.path.join(script_dir, "*-zephyr.signed.hex")
+        signed_files = glob.glob(search_pattern)
+        
+        if not signed_files:
+            print("[Flash Error] Could not find a matching '*-zephyr.signed.hex' file in the directory.")
+            print("[Flash Error] Skipping programming phase.\n")
+        else:
+            # Pick the first matching signed file found
+            signed_hex = signed_files[0]
+            filename = os.path.basename(signed_hex)
+            
+            # --- SECOND CONFIRMATION STEP ---
+            print(f"\nFound file: {filename}")
+            confirm_flash = input(f"Is '{filename}' the file you would like to flash? (y/n): ").strip().lower()
+            
+            if confirm_flash not in ['y', 'yes']:
+                print("[Flash] Cancelled by user. Skipping programming phase.\n")
+            else:
+                try:
+                    # 2. Run Command 1: Base zephyr erase & flash
+                    print("\n[Flash] Executing chiperase & flashing base zephyr.hex...")
+                    await asyncio.to_thread(
+                        subprocess.run, 
+                        ["nrfjprog", "--program", "zephyr.hex", "--chiperase", "--verify"], 
+                        check=True
+                    )
+                    
+                    # 3. Run Command 2: Version-controlled signed flash
+                    print(f"[Flash] Executing sectorerase & flashing {filename}...")
+                    await asyncio.to_thread(
+                        subprocess.run, 
+                        ["nrfjprog", "--program", signed_hex, "--sectorerase", "--verify"], 
+                        check=True
+                    )
+                    await asyncio.sleep(2.0)
+
+                    print("[Flash] Resetting the board...")
+                    await asyncio.to_thread(
+                        subprocess.run, 
+                        ["nrfjprog", "--reset"], 
+                        check=True
+                    )
+
+                    print("[Flash] Board programmed successfully!\n")
+                    await asyncio.sleep(5.0)
+                    
+                except subprocess.CalledProcessError as e:
+                    print(f"\n[Flash Error] nrfjprog failed with exit code {e.returncode}.")
+                    print("[Flash Error] Aborting protocol tests for safety.\n")
+                    return  # Halts the program if flashing fails
+    else:
+        print("\n[Flash] Skipping programming phase.")
+
     # Discover serial lines
     modbus_port, sdi12_port = auto_detect_serial_ports(slave_id=1)
     

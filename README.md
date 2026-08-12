@@ -33,7 +33,9 @@ pip install -r requirements.txt
 ```
 
 ## Running the tests
-- Plug the DTC interface into the testing jig, once the firmware is downloaded on to it. 
+- Plug the DTC interface into the testing jig.
+- If it needs to be programmed, download the files and move them into the DTC-Interface-Testing folder.
+- The first prompt will ask if you'd like to program the board. 
 - This program is intented to run using the default Modbus and SDI-12 settings.
 - Plug the SDI-12 and Modbus converters into the computer. 
 - Run the following command to execute the tests:
