@@ -106,7 +106,7 @@ def run_sdi12_test(port, sensor_address='0'):
                     if wait_time1 > 0:
                         print(f"[SDI-12] Waiting {wait_time1}s for compilation...")
                         time.sleep(wait_time1)
-                    #print(f"[SDI-12 Fetch] Collecting {total_expected1} data values from Group 1...")
+                    
                     pass2_values = collect_data_slice(ser, sensor_address, total_expected1)
                     all_collected_values.extend(pass2_values)
 
@@ -121,7 +121,7 @@ def run_sdi12_test(port, sensor_address='0'):
             print("         --- SDI-12 Temperatures ---       ")
             print("="*45)
             for index, val in enumerate(all_collected_values):
-                if val == 99.00 or val == 85.00:
+                if val == 99.00 or val == 85.00 or val == -999:
                     print(f" -> Sensor #{index + 1} : {val:.2f}: [ERROR]")
                     error = error + 1
                 else:
