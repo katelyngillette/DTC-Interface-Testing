@@ -89,10 +89,35 @@ def auto_detect_serial_ports(slave_id=1):
             except Exception:
                 continue
 
-    # Exit check
+    
+    # Exit or manual selection check
     if not modbus_port or not sdi12_port:
         print(f"\n[Auto-Discovery ERROR] Mapping failed. Status -> Modbus: {modbus_port}, SDI-12: {sdi12_port}")
-        sys.exit(1)
+        print("\n[Manual Selection] Please choose the correct ports from the list below:")
+        
+        all_paths = [path for path, info in normalized_ports]
+        for idx, path in enumerate(all_paths):
+            print(f"  [{idx}] {path}")
+            
+        # Manually pick Modbus if missing
+        if not modbus_port:
+            while True:
+                try:
+                    choice = input("Enter the number for the Modbus port: ").strip()
+                    modbus_port = all_paths[int(choice)]
+                    break
+                except (ValueError, IndexError):
+                    print("Invalid choice. Try again.")
+                    
+        # Manually pick SDI-12 if missing
+        if not sdi12_port:
+            while True:
+                try:
+                    choice = input("Enter the number for the SDI-12 port: ").strip()
+                    sdi12_port = all_paths[int(choice)]
+                    break
+                except (ValueError, IndexError):
+                    print("Invalid choice. Try again.")
 
     return modbus_port, sdi12_port
 
