@@ -1,0 +1,2 @@
+pip install pyserial pymodbus bleak
+python -c "import serial, pymodbus, bleak; print('All dependencies installed successfully!')"
