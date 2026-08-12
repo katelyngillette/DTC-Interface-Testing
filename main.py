@@ -14,40 +14,48 @@ from ble import run_bluetooth_diagnostics
 
 def auto_detect_serial_ports(slave_id=1):
     """
-    Maps Modbus to usbserial-AB0JRCBJ first (with dynamic backup scanning),
-    and forces SDI-12 to map strictly to usbserial-AQ00BEJS.
+    Cross-platform auto-discovery supporting Windows, macOS, and Linux.
+    Matches devices by hardware serial IDs instead of platform-specific paths.
     """
     ports = list(serial.tools.list_ports.comports())
-    # Filter and normalize paths upfront for macOS/Linux compatibility
     normalized_ports = []
+    
     for p in ports:
         port_path = p.device
-        if "debug-console" in port_path or "Bluetooth-Incoming" in port_path:
+        
+        # Guard against virtual/debug ports
+        if any(x in port_path for x in ["debug-console", "Bluetooth-Incoming", "bthdb"]):
             continue
+            
+        # macOS specific normalization if using legacy callout devices
         if sys.platform == "darwin" and "cu.usbserial" in port_path:
             port_path = port_path.replace("cu.usbserial", "tty.usbserial")
-        normalized_ports.append(port_path)
+        
+        # Consolidate all identifiers into a searchable metadata string
+        # Windows uses hwid; macOS uses serial_number/description
+        metadata = f"{p.description or ''} {p.serial_number or ''} {p.hwid or ''}"
+        normalized_ports.append((port_path, metadata))
 
     modbus_port = None
     sdi12_port = None
 
-    print("\n[Auto-Discovery] Initializing static map and fallback scan...")
+    print(f"\n[Auto-Discovery] Initializing static map on platform: {sys.platform}...")
 
-    # Step 1: Enforce the absolute mapping rule for SDI-12
-    for port in normalized_ports:
-        if "usbserial-AQ00BEJS" in port:
-            sdi12_port = port
+    # Step 1: Strict SDI-12 chip matching (Universal Serial Identifier)
+    for path, info in normalized_ports:
+        if "AQ00BEJS" in info:
+            sdi12_port = path
             print(f" [✓] SDI-12 Interface Explicitly Mapped to {sdi12_port}")
             break
 
     if not sdi12_port:
-        print("[System WARNING] Expected SDI-12 hardware adapter (usbserial-AQ00BEJS) was not detected on the bus.")
+        print("[System WARNING] Expected SDI-12 hardware adapter (AQ00BEJS) was not detected.")
 
-    # Remove the assigned SDI-12 port so Modbus never accidentally steals it
-    remaining_ports = [p for p in normalized_ports if p != sdi12_port]
+    # Prevent Modbus scanning from touching the SDI-12 hardware
+    remaining_ports = [(path, info) for path, info in normalized_ports if path != sdi12_port]
 
-    # Step 2: Try mapping Modbus to the preferred adapter string first
-    preferred_modbus = [p for p in remaining_ports if "usbserial-AB0JRCBJ" in p]
+    # Step 2: Preferred Modbus chip matching
+    preferred_modbus = [path for path, info in remaining_ports if "AB0JRCBJ" in info]
     if preferred_modbus:
         target_port = preferred_modbus[0]
         try:
@@ -59,13 +67,13 @@ def auto_detect_serial_ports(slave_id=1):
                 master.execute(slave_id, cst.READ_INPUT_REGISTERS, 0, 1)
                 print(f" [✓] Modbus Signature Found on preferred adapter: {target_port}!")
                 modbus_port = target_port
-        except (modbus_tk.modbus.ModbusError, serial.SerialException, Exception):
+        except Exception:
             print(f" [!] Preferred adapter {target_port} connected but failed to answer Modbus queries.")
 
-    # Step 3: Fallback discovery if the preferred adapter isn't found or failed
+    # Step 3: Fallback sequential discovery scan
     if not modbus_port:
-        print(" -> Preferred Modbus port unavailable or failed. Scanning remaining adapters...")
-        fallback_ports = [p for p in remaining_ports if "usbserial-AB0JRCBJ" not in p]
+        print(" -> Preferred Modbus port unavailable. Scanning remaining physical adapters...")
+        fallback_ports = [path for path, info in remaining_ports if "AB0JRCBJ" not in info]
         for port in fallback_ports:
             print(f" -> Probing alternative port {port} for Modbus RTU signature...")
             try:
@@ -78,13 +86,12 @@ def auto_detect_serial_ports(slave_id=1):
                     print(f" [✓] Modbus Signature Found on fallback port {port}!")
                     modbus_port = port
                     break
-            except (modbus_tk.modbus.ModbusError, serial.SerialException, Exception):
+            except Exception:
                 continue
 
-    # Final validation check
+    # Exit check
     if not modbus_port or not sdi12_port:
         print(f"\n[Auto-Discovery ERROR] Mapping failed. Status -> Modbus: {modbus_port}, SDI-12: {sdi12_port}")
-        print("[System Hint] Verify device connections, power, and matching Slave IDs.")
         sys.exit(1)
 
     return modbus_port, sdi12_port
