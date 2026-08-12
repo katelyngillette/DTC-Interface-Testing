@@ -1,5 +1,7 @@
 # DTC Interface Testing
 
+Guide with screenshots located here: https://docs.google.com/document/d/16dvxJFQkmvo3N9zFUSdiVMgt7_OauydwNHncSQwC_uY/edit?usp=sharing 
+
 Install requirements.txt on first run through. 
 
 ## MacOS
