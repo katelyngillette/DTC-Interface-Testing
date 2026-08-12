@@ -46,7 +46,7 @@ def auto_detect_serial_ports(slave_id=1):
     for path, info in normalized_ports:
         if "AQ00BEJS" in info:
             sdi12_port = path
-            print(f" [✓] SDI-12 Interface Explicitly Mapped to {sdi12_port}")
+            print(f" [✓] SDI-12 Interface Found on preferred adapter: {sdi12_port}")
             break
 
     if not sdi12_port:
