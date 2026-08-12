@@ -1,0 +1,9 @@
+bleak==3.0.2
+cbor2==6.1.4
+modbus_tk==1.1.5
+pymodbus==3.14.0
+pyobjc-core==12.2.2
+pyobjc-framework-Cocoa==12.2.2
+pyobjc-framework-CoreBluetooth==12.2.2
+pyobjc-framework-libdispatch==12.2.2
+pyserial==3.5
