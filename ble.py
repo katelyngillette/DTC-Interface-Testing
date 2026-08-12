@@ -39,6 +39,7 @@ class MCUmgrShellClient:
 
     async def execute_shell_command(self, cmd_string, timeout=4.0):
         """Encapsulates a string command into an MCUmgr Group 9 (Shell) packet."""
+        #Allows access to Shell commands created in firmware
         self._raw_buffer = bytearray()
         self._expected_length = 0
         self.received_text_chunks = []
@@ -67,8 +68,9 @@ class MCUmgrShellClient:
 
 
 async def run_bluetooth_diagnostics(device_mac_or_uuid=None):
+    #Connects to bluetooth
     target_address = device_mac_or_uuid if device_mac_or_uuid else DEVICE_ADDRESS
-    print(f"\n🌐 [BLE Link] Connecting to Zephyr hardware over Bluetooth: {target_address}")
+    print(f"\n [BLE Link] Connecting to Zephyr hardware over Bluetooth: {target_address}")
     
     try:
         async with BleakClient(target_address, timeout=10.0) as client:
@@ -81,9 +83,8 @@ async def run_bluetooth_diagnostics(device_mac_or_uuid=None):
             shell = MCUmgrShellClient(client)
 
             # =========================================================================
-            # TASK 1: Check Power Configuration via dtc status
+            # TASK 1: Check Firmware Version, DTC Status, and Power State
             # =========================================================================
-            #print(" 🔍 Querying power rail constraints via Bluetooth Shell...")
             print("\n" + "="*45)
             print("         --- DTC Information ---       ")
             print("="*45)
@@ -96,9 +97,9 @@ async def run_bluetooth_diagnostics(device_mac_or_uuid=None):
 
             print(console_output.strip() if console_output else "[Empty Response]")
             print("-----------------------------------------")
-
+            #Checks if expected number of sensors matched number printed with dtc temps
             expected_sensors = 0
-            # --- FIX: Match your specific "DS18B20: X / 125" layout ---
+
             sensor_count_match = re.search(r'DS18B20:\s*(\d+)', console_output, re.IGNORECASE)
             
             if sensor_count_match:
@@ -106,7 +107,7 @@ async def run_bluetooth_diagnostics(device_mac_or_uuid=None):
                 print(f" [✓] Detected {expected_sensors} expected sensors from status.")
             else:
                 print(" ⚠️ Warning: Could not parse expected sensor count from status text.")
-
+            #Checks for parasitic or external power
             external_powered = True
             if console_output and "Parasitic" in console_output:
                 print(" ⚠️ POWER WARNING: Running on Parasitic Draw (External 5V Line is BROKEN!)")
@@ -119,7 +120,7 @@ async def run_bluetooth_diagnostics(device_mac_or_uuid=None):
             await asyncio.sleep(1.0)
 
             # =========================================================================
-            # TASK 2: Automated Temp Array Validation
+            # TASK 2: DTC Temps
             # =========================================================================
             temps_output = await shell.execute_shell_command("dtc temps")
             print("\n" + "="*45)
@@ -132,12 +133,11 @@ async def run_bluetooth_diagnostics(device_mac_or_uuid=None):
             # Extract all numeric float readings from the output string
             # Uses a strict match to capture decimal structures like "24.78"
             parsed_floats = [float(val) for val in re.findall(r'temp:\s*([+-]?\d+\.\d+)', temps_output, re.IGNORECASE)]
-            
-            # Fallback filter if "temp: " isn't a direct prefix in all firmware variations
+
             if not parsed_floats:
                 parsed_floats = [float(val) for val in re.findall(r'([+-]?\d+\.\d+)', temps_output)]
 
-            # Filter out known hardware error indicators (85.0 and 99.0)
+            # Filter out error indicators (85.0 and 99.0)
             valid_temps = [t for t in parsed_floats if t != 85.0 and t != 99.0]
             invalid_temps_count = len(parsed_floats) - len(valid_temps)
 
@@ -148,7 +148,7 @@ async def run_bluetooth_diagnostics(device_mac_or_uuid=None):
             else: 
                 print(f" └── Total temps: {len(parsed_floats)}")
 
-            # Assert verification check against the topology layout
+            # Assert verification check against number of expected sensors
             temp_validation_success = True
             if expected_sensors > 0:
                 if len(valid_temps) != expected_sensors:
@@ -165,10 +165,9 @@ async def run_bluetooth_diagnostics(device_mac_or_uuid=None):
             await asyncio.sleep(1.0)
 
             # =========================================================================
-            # TASK 3: Trigger Physical LED Test Sequence & Verify Colors
+            # TASK 3: Test Bluetooth Connection and LED 
             # =========================================================================
             loop = asyncio.get_running_loop()
-            #print("\n[Prompt] Next stage will trigger the physical LED test pattern.")
             
             while True:
                 confirm = await loop.run_in_executor(
@@ -183,8 +182,8 @@ async def run_bluetooth_diagnostics(device_mac_or_uuid=None):
                 led_output = await shell.execute_shell_command("led_test")
                 if led_output:
                     print(f"{led_output.strip()}")
-                
-                #print(" [!] Execution command sent. Pausing 3 seconds for hardware color cycling...")
+
+                #Wait for led test to run
                 await asyncio.sleep(3.25)
                 
                 while True:
@@ -206,6 +205,7 @@ async def run_bluetooth_diagnostics(device_mac_or_uuid=None):
                 print("[BLE Action] Skipping LED hardware test at user request.")
                 led_test_success = False
 
+            # Final Result Summary
             if(not temp_validation_success or not led_test_success or not external_powered):
                 if(not temp_validation_success):
                     print(" ❌ Bluetooth Diagnostic Result: Temperature validation failed.")

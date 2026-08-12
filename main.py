@@ -116,7 +116,6 @@ async def selective_ble_selection():
     
     loop = asyncio.get_running_loop()
     while True:
-        # FIX 2: Update the interactive prompt helper string window
         user_input = await loop.run_in_executor(
             None, input, f"Select a device index (1-{len(target_devices)}) or press enter to skip: "
         )
@@ -133,14 +132,13 @@ async def selective_ble_selection():
                 return chosen.address
         except ValueError:
             pass
-        # FIX 4: Correct error response message limits
         print(f"[Error] Invalid selection. Choose a number from 1 to {len(target_devices)}.")
 
 async def main():
     # Discover serial lines
     modbus_port, sdi12_port = auto_detect_serial_ports(slave_id=1)
     
-    # --- FIX 1: Run and await the BLE search selection ---
+    # Run and await the BLE search selection ---
     target_ble_address = await selective_ble_selection()
 
     print("\n" + "="*50)
@@ -159,13 +157,13 @@ async def main():
 
     # --- PROTOCOL 3: BLUETOOTH BLE ---
     print("\n>>> STEP 3: RUNNING BLUETOOTH TEST <<<")
-    # --- FIX 2: Bind the runtime check to the dynamically scanned address ---
     if target_ble_address:
         ble_check = await run_bluetooth_diagnostics(target_ble_address)
     else:
         print("[BLE SKIPPED] No target device was selected or found during scan.")
         ble_check = False
 
+    # Final Summary
     print("\n" + "="*50)
     if modbus_check and sdi_check and ble_check:
         print("[✓] All protocol tests completed successfully.")

@@ -9,6 +9,7 @@ def run_modbus_test(port, slave_id=1):
     print(f"[Modbus] Starting on {port}...")
     
     try:
+        #default settings for DTC Interface Modbus
         ser = serial.Serial(
             port=port,
             baudrate=9600,
@@ -24,8 +25,7 @@ def run_modbus_test(port, slave_id=1):
         ser.reset_input_buffer()
         ser.reset_output_buffer()
         
-        # --- STEP 1: Read the sensor count at register 0 ---
-        #print("[Modbus Query 1/2] Fetching active sensor count from register 0...")
+        #Read the sensor count at register 0 
         count_response = master.execute(slave_id, cst.READ_INPUT_REGISTERS, 0, 1)
         
         if not count_response:
@@ -44,12 +44,10 @@ def run_modbus_test(port, slave_id=1):
             print(f"[Modbus Warning] Count ({active_count}) exceeds safety limit. Capping at 125.")
             active_count = 125
 
-        # --- STEP 2: Dynamically read all active temperature registers ---
-        # Starting at address 1, read exactly 'active_count' registers
-        #print(f"[Modbus Query 2/2] Requesting {active_count} registers from address 1...")
+        #Read all active temperature registers 
+
         temp_response = master.execute(slave_id, cst.READ_INPUT_REGISTERS, 1, active_count)
         
-        #print(f"[Modbus SUCCESS] Raw payload data received -> {temp_response}")
         print("\n" + "="*45)
         print("         --- Modbus Temperatures ---       ")
         print("="*45)
@@ -59,23 +57,24 @@ def run_modbus_test(port, slave_id=1):
             register_address = 1 + i
             raw_temp = temp_response[i]
             
-            # Format negative temperatures if your device uses 16-bit signed integers (Two's Complement)
+            # Format negative temperatures
             if raw_temp > 32767:
                 raw_temp -= 65536
 
-            if raw_temp == 9900:
+            #Flag error readings (85.0°C and 99.0°C) as invalid
+            if raw_temp == 9900 or raw_temp == 8500:
                 print(f"  -> Sensor #{i+1} [Reg {register_address}]: [ERROR]")
                 error = error + 1
             scaled_temp = raw_temp / 100.0
             print(f"  -> Sensor #{i+1} : {scaled_temp}°C")
-            
-        #print("[Modbus SUCCESS] Dynamic temperature sweep completed cleanly.")
-            
+
+        # Final Summary
+        print(f"[Modbus] Total errors found: {error}")
+        if error > 0:
+            return False
+        else: 
+            return True
+    
     except Exception as e:
         print(f"[Modbus ERROR] Transaction failed: {e}")
         
-    print(f"[Modbus] Total errors found: {error}")
-    if error > 0:
-        return False
-    else: 
-        return True
